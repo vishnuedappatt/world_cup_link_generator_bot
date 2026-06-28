@@ -18,8 +18,10 @@ Run:
     TELEGRAM_BOT_TOKEN="123456:ABC..." ./envv/bin/python telegram_bot.py
 """
 
+import logging
 import os
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -93,7 +95,9 @@ def load_token():
     return token
 
 
-bot = telebot.TeleBot(load_token(), parse_mode="HTML")
+# num_threads: handlers do slow network work (3-4s each), so give the worker
+# pool enough threads that concurrent taps don't starve update processing.
+bot = telebot.TeleBot(load_token(), parse_mode="HTML", num_threads=8)
 
 
 # --- Helpers ----------------------------------------------------------------
@@ -396,8 +400,30 @@ def start_health_server():
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
+def run_bot_forever():
+    """Supervise polling: if it ever dies/hangs out, restart it instead of
+    leaving the bot silently unresponsive."""
+    while True:
+        try:
+            bot.infinity_polling(
+                timeout=30,               # HTTP read timeout per getUpdates
+                long_polling_timeout=30,  # server holds the request up to 30s
+                skip_pending=True,
+            )
+        except Exception as exc:
+            print(f"[polling] crashed: {exc!r} — restarting in 5s")
+        else:
+            print("[polling] returned unexpectedly — restarting in 5s")
+        time.sleep(5)
+
+
 if __name__ == "__main__":
+    # Surface polling/network issues in the logs (helpful on Render).
+    logging.basicConfig(level=logging.INFO)
+    telebot.logger.setLevel(logging.INFO)
+
     # Health/keep-alive web server in the background (needed on Render free tier).
     threading.Thread(target=start_health_server, daemon=True).start()
+
     print("Bot started. Press Ctrl+C to stop.")
-    bot.infinity_polling(skip_pending=True)
+    run_bot_forever()
