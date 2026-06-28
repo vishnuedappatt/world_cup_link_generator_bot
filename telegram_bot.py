@@ -400,6 +400,23 @@ def start_health_server():
     HTTPServer(("0.0.0.0", port), Handler).serve_forever()
 
 
+def start_keep_alive():
+    """Ping our own public URL every ~10 min so Render's free tier never hits
+    the 15-min idle timeout and suspends the instance. Render injects
+    RENDER_EXTERNAL_URL automatically; off-Render this is a no-op."""
+    url = os.environ.get("RENDER_EXTERNAL_URL")
+    if not url:
+        print("[keepalive] RENDER_EXTERNAL_URL not set — keep-alive disabled (fine locally).")
+        return
+    print(f"[keepalive] self-ping enabled -> {url}")
+    while True:
+        time.sleep(600)  # 10 minutes (< Render's 15-min idle window)
+        try:
+            requests.get(url, timeout=15)
+        except Exception as exc:
+            print(f"[keepalive] ping failed: {exc}")
+
+
 def run_bot_forever():
     """Supervise polling: if it ever dies/hangs out, restart it instead of
     leaving the bot silently unresponsive."""
@@ -422,8 +439,10 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     telebot.logger.setLevel(logging.INFO)
 
-    # Health/keep-alive web server in the background (needed on Render free tier).
+    # Health web server (needed on Render free tier so a port is open).
     threading.Thread(target=start_health_server, daemon=True).start()
+    # Self-ping so the free instance never idles into suspension.
+    threading.Thread(target=start_keep_alive, daemon=True).start()
 
     print("Bot started. Press Ctrl+C to stop.")
     run_bot_forever()
