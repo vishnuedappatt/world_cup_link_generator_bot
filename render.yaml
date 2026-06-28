@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: worldcup-link-bot
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python telegram_bot.py
+    envVars:
+      # Set the real value in the Render dashboard (kept secret, not in git).
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: OWNER_USERNAME
+        value: "@vishnuedappatt"
+      - key: PYTHON_VERSION
+        value: "3.10.16"

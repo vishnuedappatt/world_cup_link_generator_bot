@@ -375,6 +375,29 @@ def on_other(message):
     )
 
 
+def start_health_server():
+    """Tiny HTTP server so hosts like Render (which require an open port) see a
+    healthy web service. Also serves as the URL an uptime pinger can hit to keep
+    a free instance awake. Runs in a daemon thread; the bot keeps polling."""
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    port = int(os.environ.get("PORT", "10000"))
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"OK - World Cup link bot is running")
+
+        def log_message(self, *args):
+            pass  # silence per-request logging
+
+    HTTPServer(("0.0.0.0", port), Handler).serve_forever()
+
+
 if __name__ == "__main__":
+    # Health/keep-alive web server in the background (needed on Render free tier).
+    threading.Thread(target=start_health_server, daemon=True).start()
     print("Bot started. Press Ctrl+C to stop.")
     bot.infinity_polling(skip_pending=True)

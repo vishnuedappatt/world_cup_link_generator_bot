@@ -9,3 +9,4 @@ sportshuber_blogspot/
 tests/
 __pycache__/
 .env
+bot_token.txt
