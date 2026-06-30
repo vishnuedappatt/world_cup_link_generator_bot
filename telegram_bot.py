@@ -73,6 +73,14 @@ IST = ZoneInfo("Asia/Kolkata")
 FIFA_URL = "https://play.fifa.com/json/dream_eleven/rounds.json"
 FIFA_HEADERS = {"User-Agent": "Mozilla/5.0", "Accept": "application/json"}
 
+# Map FIFA names to the names our sources use
+TEAM_ALIASES = {
+    "Côte d'Ivoire": "Ivory Coast",
+    "Korea Republic": "South Korea",
+    "IR Iran": "Iran",
+    "USA": "United States",
+}
+
 # Telegram caps inline keyboards; keep well under the 100-button limit.
 MAX_LINK_BUTTONS = 80
 
@@ -157,9 +165,11 @@ def load_match_list():
             kickoff = datetime.fromisoformat(match["date"]).astimezone(IST)
             if kickoff.date() not in (today, tomorrow):
                 continue
+            home_name = match["homeSquadName"]
+            away_name = match["awaySquadName"]
             matches.append({
-                "home": match["homeSquadName"],
-                "away": match["awaySquadName"],
+                "home": TEAM_ALIASES.get(home_name, home_name),
+                "away": TEAM_ALIASES.get(away_name, away_name),
                 "kickoff": kickoff.isoformat(),
                 "kickoff_label": kickoff.strftime("%a %d %b, %I:%M %p IST"),
                 "day": "today" if kickoff.date() == today else "tomorrow",
