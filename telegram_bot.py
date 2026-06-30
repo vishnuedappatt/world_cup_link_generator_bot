@@ -49,7 +49,7 @@ apihelper.RETRY_TIMEOUT = 2       # seconds between retries
 
 WARNING = (
     "⚠️ <b>Heads up:</b> working stream links are usually posted about "
-    "<b>30 minutes before kickoff</b>. If you don't see links yet, check back "
+    "<b>5-10 minutes before kickoff</b>. If you don't see links yet, check back "
     "closer to match time."
 )
 
@@ -156,7 +156,8 @@ def load_match_list():
     resp.raise_for_status()
     rounds = resp.json()
 
-    today = datetime.now(IST).date()
+    now = datetime.now(IST)
+    today = now.date()
     tomorrow = today + timedelta(days=1)
 
     matches = []
@@ -164,6 +165,9 @@ def load_match_list():
         for match in round_data.get("tournaments", []):
             kickoff = datetime.fromisoformat(match["date"]).astimezone(IST)
             if kickoff.date() not in (today, tomorrow):
+                continue
+            # Keep showing the match for 2.5 hours after kickoff
+            if kickoff + timedelta(hours=2, minutes=30) < now:
                 continue
             home_name = match["homeSquadName"]
             away_name = match["awaySquadName"]
@@ -229,7 +233,11 @@ def collect_unique_links(home, away):
         if res.ok and res.links:
             sources_with_links += 1
             flat.extend(res.links)
-    unique = [l for l in dedupe_links(flat) if str(l.get("url", "")).startswith("http")]
+    unique = []
+    for l in dedupe_links(flat):
+        url_str = str(l.get("url", "")).lower()
+        if url_str.startswith("http") and "whatsapp" not in url_str and "linkedin" not in url_str:
+            unique.append(l)
     return unique, sources_with_links
 
 
